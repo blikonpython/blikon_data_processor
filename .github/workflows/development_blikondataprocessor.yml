@@ -79,14 +79,21 @@ jobs:
       - name: Install jq
         run: sudo apt-get install -y jq
 
+      - name: Fetch and display artifacts from GitHub API
+        id: fetch-artifacts
+        run: |
+          curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          "https://api.github.com/repos/${{ github.repository }}/actions/artifacts" > artifacts_response.json
+          cat artifacts_response.json
+
       - name: List artifacts
         id: list-artifacts
         run: |
-          curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-          "https://api.github.com/repos/${{ github.repository }}/actions/artifacts" \
-          | jq '.artifacts[] | select(.expired == false) | .id' > artifact_ids.txt
+          jq '.artifacts[] | select(.expired == false) | .id' artifacts_response.json > artifact_ids.txt
+          cat artifact_ids.txt
 
       - name: Delete artifacts
+        if: success() && steps.list-artifacts.outputs.artifact_ids.txt != ''
         run: |
           for id in $(cat artifact_ids.txt); do
             curl -X DELETE -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
