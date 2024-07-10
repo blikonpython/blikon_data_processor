@@ -1,14 +1,12 @@
-# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
-# More GitHub Actions for Azure: https://github.com/Azure/actions
-# More info on Python, GitHub Actions, and Azure App Service: https://aka.ms/python-webapps-actions
-
-name: Build and deploy Python app to Azure Web App - blikondataprocessor
+name: Build, Deploy, and Cleanup Artifacts for Azure Web App - blikondataprocessor
 
 on:
   push:
     branches:
       - development
   workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 0' # Ejecutar semanalmente
 
 jobs:
   build:
@@ -26,10 +24,10 @@ jobs:
         run: |
           python -m venv venv
           source venv/bin/activate
-      
+
       - name: Install dependencies
         run: pip install -r requirements.txt
-        
+
       # Optional: Add step to run tests here (PyTest, Django test suites, etc.)
 
       - name: Zip artifact for deployment
@@ -61,7 +59,6 @@ jobs:
       - name: Unzip artifact for deployment
         run: unzip release.zip
 
-      
       - name: Login to Azure
         uses: azure/login@v1
         with:
@@ -75,4 +72,30 @@ jobs:
         with:
           app-name: 'blikondataprocessor'
           slot-name: 'Production'
-          
+
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      - name: Fetch and display artifacts from GitHub API
+        id: fetch-artifacts
+        run: |
+          curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          "https://api.github.com/repos/${{ github.repository }}/actions/artifacts" > artifacts_response.json
+          cat artifacts_response.json
+
+      - name: List artifacts
+        id: list-artifacts
+        run: |
+          jq '.artifacts[] | select(.expired == false) | .id' artifacts_response.json > artifact_ids.txt
+          cat artifact_ids.txt
+
+      - name: Delete artifacts
+        if: success() && steps.list-artifacts.outputs.artifact_ids.txt != ''
+        run: |
+          for id in $(cat artifact_ids.txt); do
+            curl -X DELETE -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/$id"
+          done
