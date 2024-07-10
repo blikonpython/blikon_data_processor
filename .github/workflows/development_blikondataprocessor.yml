@@ -75,7 +75,6 @@ jobs:
 
   cleanup:
     runs-on: ubuntu-latest
-    if: github.event_name == 'schedule'
     steps:
       - name: Install jq
         run: sudo apt-get install -y jq
