@@ -1,16 +1,11 @@
 from flask import Flask
-from .config import Config
-import pyrebase
 from dotenv import load_dotenv
+import os
 
-load_dotenv()
+load_dotenv()  # Cargar variables de entorno desde .env
 
 def create_app():
     app = Flask(__name__)
-    app.config.from_object(Config)
-
-    firebase = pyrebase.initialize_app(app.config['FIREBASE_CONFIG'])
-    app.config['db'] = firebase.database()
 
     with app.app_context():
         from .routes import main
